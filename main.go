@@ -23,6 +23,8 @@ func main() {
 		return c.String(http.StatusOK, "Hello, Go Bootcamp!")
 	})
 
+	e.POST("/tax/calculations", tax.CalculateTax)
+
 	port := os.Getenv("PORT")
 
 	go func() {
