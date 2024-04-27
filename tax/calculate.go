@@ -2,41 +2,49 @@ package tax
 
 import (
 	"database/sql"
-	"fmt"
+	"encoding/json"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 )
 
+var (
+	fetchDeductionFunc = fetchDeduction
+)
+
 func CalculateTax(c echo.Context) error {
+	decoder := json.NewDecoder(c.Request().Body)
+	decoder.DisallowUnknownFields() // Ensure no unknown fields are sent
+
 	var req TaxRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Invalid request data"})
+	if err := decoder.Decode(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, Err{Message: "Invalid request: JSON contains unknown fields or incorrect format"})
 	}
 
-	// Fetch deduction from the database
-	var deduction float64
-	err := db.QueryRow("SELECT deduction FROM admin_config").Scan(&deduction)
+	valid, errMsg := validateReq(&req)
+	if !valid {
+		return c.JSON(http.StatusBadRequest, Err{Message: errMsg})
+	}
 
-	fmt.Println("deduction on db is : ", deduction)
+	deduction, err := fetchDeductionFunc()
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return c.JSON(http.StatusNotFound, echo.Map{"error": "Deduction data not found"})
+			return c.JSON(http.StatusNotFound, Err{Message: "Deduction data not found"})
 		}
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to fetch deduction data", "details": err.Error()})
+		return c.JSON(http.StatusInternalServerError, Err{Message: "Failed to fetch deduction data"})
 	}
 
-	// Calculate net income
 	netIncome := req.TotalIncome - deduction
-
-	// Calculate tax based on progressive tax rates
 	tax := calculateProgressiveTax(netIncome)
-
-	response := TaxResponse{
-		Tax: tax,
-	}
+	response := TaxResponse{Tax: tax}
 
 	return c.JSON(http.StatusOK, response)
+}
+
+func fetchDeduction() (float64, error) {
+	var deduction float64
+	err := db.QueryRow("SELECT deduction FROM admin_config").Scan(&deduction)
+	return deduction, err
 }
 
 func calculateProgressiveTax(income float64) float64 {
@@ -58,4 +66,22 @@ func calculateProgressiveTax(income float64) float64 {
 	}
 
 	return tax
+}
+
+func validateReq(req *TaxRequest) (bool, string) {
+	if req.TotalIncome <= 0 {
+		return false, "'totalIncome' must be specified and greater than zero"
+	}
+	if req.WHT < 0 {
+		return false, "'WHT' cannot be negative"
+	}
+	for _, allowance := range req.Allowances {
+		if allowance.Amount < 0 {
+			return false, "Allowance amounts cannot be negative"
+		}
+		if allowance.AllowanceType == "" {
+			return false, "Allowance type cannot be empty"
+		}
+	}
+	return true, ""
 }
