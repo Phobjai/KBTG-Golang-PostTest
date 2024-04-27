@@ -11,6 +11,7 @@ import (
 
 	"github.com/Phobjai/assessment-tax/tax"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 
 	_ "github.com/lib/pq"
 )
@@ -19,6 +20,8 @@ func main() {
 	tax.InitDB()
 
 	e := echo.New()
+	e.Use(middleware.Logger())
+
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello, Go Bootcamp!")
 	})

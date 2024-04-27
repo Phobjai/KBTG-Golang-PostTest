@@ -35,8 +35,17 @@ func CalculateTax(c echo.Context) error {
 	}
 
 	netIncome := req.TotalIncome - deduction
-	tax := calculateProgressiveTax(netIncome)
-	response := TaxResponse{Tax: tax}
+	// Calculate initial tax based on net income
+	calculatedTax := calculateProgressiveTax(netIncome)
+	// Adjust tax by WHT
+	taxAfterWHT := calculatedTax - req.WHT
+
+	// Prepare the response
+	response := TaxResponse{Tax: taxAfterWHT}
+	if taxAfterWHT < 0 { // If the tax after WHT is negative, it means a refund is due
+		response.Tax = 0
+		response.TaxRefund = -taxAfterWHT // Refund amount is the negative tax
+	}
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -74,6 +83,10 @@ func validateReq(req *TaxRequest) (bool, string) {
 	}
 	if req.WHT < 0 {
 		return false, "'WHT' cannot be negative"
+	}
+
+	if req.WHT > req.TotalIncome {
+		return false, "'WHT' cannot be more than total income"
 	}
 	for _, allowance := range req.Allowances {
 		if allowance.Amount < 0 {
