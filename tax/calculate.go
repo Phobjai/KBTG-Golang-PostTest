@@ -34,10 +34,10 @@ func CalculateTax(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Err{Message: "Failed to fetch deduction data"})
 	}
 
-	netIncome := req.TotalIncome - deduction
-	// Calculate initial tax based on net income
+	totalDonations := calculateDonationAllowance(req.Allowances)
+
+	netIncome := req.TotalIncome - deduction - totalDonations
 	calculatedTax := calculateProgressiveTax(netIncome)
-	// Adjust tax by WHT
 	taxAfterWHT := calculatedTax - req.WHT
 
 	// Prepare the response
@@ -48,6 +48,20 @@ func CalculateTax(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, response)
+}
+
+func calculateDonationAllowance(allowances []Allowance) float64 {
+	totalDonations := 0.0
+	for _, allowance := range allowances {
+		if allowance.AllowanceType == "donation" {
+			if allowance.Amount > 100000 {
+				totalDonations += 100000
+			} else {
+				totalDonations += allowance.Amount
+			}
+		}
+	}
+	return totalDonations
 }
 
 func fetchDeduction() (float64, error) {
@@ -89,11 +103,11 @@ func validateReq(req *TaxRequest) (bool, string) {
 		return false, "'WHT' cannot be more than total income"
 	}
 	for _, allowance := range req.Allowances {
+		if allowance.AllowanceType != "donation" {
+			return false, "allowanceType must be 'donation'"
+		}
 		if allowance.Amount < 0 {
 			return false, "Allowance amounts cannot be negative"
-		}
-		if allowance.AllowanceType == "" {
-			return false, "Allowance type cannot be empty"
 		}
 	}
 	return true, ""

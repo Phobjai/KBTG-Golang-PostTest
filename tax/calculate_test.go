@@ -62,8 +62,22 @@ func TestCalculateTax(t *testing.T) {
 			expectedResponse:   `{"tax":11000}`,
 		},
 		{
+			name:               "Valid Request with dotaion greater than 100000",
+			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "donation", "amount": 200000}]}`,
+			mockDeduction:      60000,
+			expectedStatusCode: http.StatusOK,
+			expectedResponse:   `{"tax": 19000}`,
+		},
+		{
+			name:               "Valid Request with dotaion lower than 100000",
+			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "donation", "amount": 20000}]}`,
+			mockDeduction:      60000,
+			expectedStatusCode: http.StatusOK,
+			expectedResponse:   `{"tax": 27000}`,
+		},
+		{
 			name:               "Valid Request",
-			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "donation", "amount": 50}]}`,
+			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "donation", "amount": 0}]}`,
 			mockDeduction:      60000,
 			expectedStatusCode: http.StatusOK,
 			expectedResponse:   `{"tax":29000}`,
@@ -101,22 +115,22 @@ func TestCalculateTax(t *testing.T) {
 			expectedResponse:   `{"message":"Invalid request: JSON contains unknown fields or incorrect format"}`,
 		}, {
 			name:               "Invalid Allowance - Negative Amount",
-			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "donation", "amount": -50}]}`,
+			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "donation", "amount": -1}]}`,
 			mockDeduction:      60000,
 			expectedStatusCode: http.StatusBadRequest,
 			expectedResponse:   `{"message":"Allowance amounts cannot be negative"}`,
 		},
 		{
-			name:               "Invalid Allowance - Empty Allowance Type",
-			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "", "amount": 50}]}`,
+			name:               "Invalid Allowance - Not dotation Allowance Type",
+			requestBody:        `{"totalIncome": 500000, "wht": 0, "allowances": [{"allowanceType": "", "amount": 0}]}`,
 			mockDeduction:      60000,
 			expectedStatusCode: http.StatusBadRequest,
-			expectedResponse:   `{"message":"Allowance type cannot be empty"}`,
+			expectedResponse:   `{"message":"allowanceType must be 'donation'"}`,
 		},
 		{
 			name:               "WHT Greater Than Total Income",
-			requestBody:        `{"totalIncome": 50000, "wht": 60000, "allowances": [{"allowanceType": "donation", "amount": 1000}]}`,
-			mockDeduction:      5000,
+			requestBody:        `{"totalIncome": 50000, "wht": 60000, "allowances": [{"allowanceType": "donation", "amount": 0}]}`,
+			mockDeduction:      60000,
 			expectedStatusCode: http.StatusBadRequest,
 			expectedResponse:   `{"message":"'WHT' cannot be more than total income"}`,
 		},
@@ -153,6 +167,27 @@ func TestCalculateTax(t *testing.T) {
 					t.Fatal("Failed to unmarshal TaxResponse:", err)
 				}
 				assert.Equal(t, expected, resp)
+			}
+		})
+	}
+
+}
+func TestCalculateDonationAllowance(t *testing.T) {
+	tests := []struct {
+		name       string
+		allowances []Allowance
+		expected   float64
+	}{
+		{"Donation Below Cap", []Allowance{{AllowanceType: "donation", Amount: 50000}}, 50000},
+		{"Donation At Cap", []Allowance{{AllowanceType: "donation", Amount: 100000}}, 100000},
+		{"Donation Above Cap", []Allowance{{AllowanceType: "donation", Amount: 200000}}, 100000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateDonationAllowance(tt.allowances)
+			if got != tt.expected {
+				t.Errorf("calculateDonationAllowance() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
