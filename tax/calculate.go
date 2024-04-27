@@ -39,12 +39,6 @@ func CalculateTax(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// Helper function to calculate tax based on net income.
-func calculateTaxFromIncome(income float64) float64 {
-	// Example: simple flat tax rate
-	return income * 0.10
-}
-
 func calculateProgressiveTax(income float64) float64 {
 	tax := 0.0
 	if income > 2000000 {
