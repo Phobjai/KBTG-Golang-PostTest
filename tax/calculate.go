@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 
+	"github.com/Phobjai/assessment-tax/initdb"
 	"github.com/labstack/echo/v4"
 )
 
@@ -34,6 +35,10 @@ func CalculateTax(c echo.Context) error {
 			return c.JSON(http.StatusNotFound, Err{Message: "Deduction data not found"})
 		}
 		return c.JSON(http.StatusInternalServerError, Err{Message: "Failed to fetch deduction data"})
+	}
+
+	if deduction < 10000 {
+		deduction = 10000
 	}
 
 	totalDonations := calculateDonationAllowance(req.Allowances)
@@ -74,7 +79,7 @@ func calculateDonationAllowance(allowances []Allowance) float64 {
 
 func fetchDeduction() (float64, error) {
 	var deduction float64
-	err := db.QueryRow("SELECT deduction FROM admin_config").Scan(&deduction)
+	err := initdb.DB.QueryRow("SELECT deduction FROM admin_config").Scan(&deduction)
 	return deduction, err
 }
 

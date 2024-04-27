@@ -9,7 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Phobjai/assessment-tax/admin"
+	"github.com/Phobjai/assessment-tax/initdb"
 	"github.com/Phobjai/assessment-tax/tax"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
@@ -17,7 +20,7 @@ import (
 )
 
 func main() {
-	tax.InitDB()
+	initdb.InitDB()
 
 	e := echo.New()
 	e.Use(middleware.Logger())
@@ -27,6 +30,12 @@ func main() {
 	})
 
 	e.POST("/tax/calculations", tax.CalculateTax)
+
+	adminGroup := e.Group("/admin")
+	adminGroup.Use(middleware.BasicAuth(validateAdmin))
+
+	// Admin specific routes
+	adminGroup.POST("/deductions/personal", admin.UpdatePersonalDeduction)
 
 	port := os.Getenv("PORT")
 
@@ -51,4 +60,8 @@ func main() {
 	//
 
 	fmt.Println("bye bye")
+}
+
+func validateAdmin(username, password string, c echo.Context) (bool, error) {
+	return username == os.Getenv("ADMIN_USERNAME") && password == os.Getenv("ADMIN_PASSWORD"), nil
 }
