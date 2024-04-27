@@ -20,7 +20,5 @@ func InitDB() {
 		log.Fatalf("Error can't connect to database: %s", err)
 	}
 
-	// Attempt to ping the database to verify connection
-
 	log.Println("Database connection successfully established.")
 }

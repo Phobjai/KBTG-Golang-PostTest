@@ -30,6 +30,7 @@ func main() {
 	})
 
 	e.POST("/tax/calculations", tax.CalculateTax)
+	e.POST("/tax/calculations/upload-csv", tax.CalculateTaxFromCSV)
 
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(middleware.BasicAuth(validateAdmin))

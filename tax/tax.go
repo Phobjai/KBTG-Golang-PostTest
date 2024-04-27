@@ -30,3 +30,9 @@ type TaxResponse struct {
 	TaxLevels []TaxLevel `json:"taxLevel"`
 	TaxRefund float64    `json:"taxRefund,omitempty"`
 }
+
+type TaxCalculation struct {
+	TotalIncome float64 `json:"totalIncome"`
+	Tax         float64 `json:"tax,omitempty"`
+	TaxRefund   float64 `json:"taxRefund,omitempty"`
+}
