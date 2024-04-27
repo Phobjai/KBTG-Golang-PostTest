@@ -3,6 +3,8 @@ package tax
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -37,13 +39,19 @@ func CalculateTax(c echo.Context) error {
 	totalDonations := calculateDonationAllowance(req.Allowances)
 
 	netIncome := req.TotalIncome - deduction - totalDonations
-	calculatedTax := calculateProgressiveTax(netIncome)
-	taxAfterWHT := calculatedTax - req.WHT
+	calculatedTax, taxLevels := calculateProgressiveTax(netIncome)
 
-	// Prepare the response
-	response := TaxResponse{Tax: taxAfterWHT}
+	fmt.Println("Calculated tax is ", calculatedTax)
+	taxAfterWHT := calculatedTax - req.WHT
+	fmt.Println("taxAfterWHT  is ", taxAfterWHT)
+
+	// Prepare the response with tax level details
+	response := TaxResponse{
+		Tax:       max(0, taxAfterWHT), // Ensure tax is not negative in the response
+		TaxLevels: taxLevels,
+	}
+
 	if taxAfterWHT < 0 { // If the tax after WHT is negative, it means a refund is due
-		response.Tax = 0
 		response.TaxRefund = -taxAfterWHT // Refund amount is the negative tax
 	}
 
@@ -70,25 +78,36 @@ func fetchDeduction() (float64, error) {
 	return deduction, err
 }
 
-func calculateProgressiveTax(income float64) float64 {
+func calculateProgressiveTax(income float64) (float64, []TaxLevel) {
 	tax := 0.0
-	if income > 2000000 {
-		tax += (income - 2000000) * 0.35
-		income = 2000000
-	}
-	if income > 1000000 {
-		tax += (income - 1000000) * 0.20
-		income = 1000000
-	}
-	if income > 500000 {
-		tax += (income - 500000) * 0.15
-		income = 500000
-	}
-	if income > 150000 {
-		tax += (income - 150000) * 0.10
+	var taxLevels []TaxLevel
+
+	brackets := []struct {
+		UpperBound float64
+		TaxRate    float64
+		Level      string // Ensure this matches the field name in your TaxLevel struct
+	}{
+		{150000, 0.0, "0-150,000"},
+		{500000, 0.10, "150,001-500,000"},
+		{1000000, 0.15, "500,001-1,000,000"},
+		{2000000, 0.20, "1,000,001-2,000,000"},
+		{math.MaxFloat64, 0.35, "2,000,001 ขึ้นไป"},
 	}
 
-	return tax
+	previousLimit := 0.0
+	for _, bracket := range brackets {
+		if income > previousLimit {
+			taxableIncome := math.Min(income, bracket.UpperBound) - previousLimit
+			taxAtThisLevel := taxableIncome * bracket.TaxRate
+			tax += taxAtThisLevel
+			taxLevels = append(taxLevels, TaxLevel{Level: bracket.Level, Tax: taxAtThisLevel})
+		} else {
+			taxLevels = append(taxLevels, TaxLevel{Level: bracket.Level, Tax: 0})
+		}
+		previousLimit = bracket.UpperBound
+	}
+
+	return tax, taxLevels
 }
 
 func validateReq(req *TaxRequest) (bool, string) {
