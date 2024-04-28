@@ -41,9 +41,16 @@ func CalculateTax(c echo.Context) error {
 		deduction = 10000
 	}
 
-	totalDonations := calculateDonationAllowance(req.Allowances)
+	kReceiptMax, err := fetchKReceiptMax() // Assume fetchKReceiptMax is defined elsewhere
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "Failed to fetch k-receipt maximum"})
+	}
 
-	netIncome := req.TotalIncome - deduction - totalDonations
+	totalAllowances, err := calculateAllowances(req.Allowances, kReceiptMax)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "Failed to fetch allowance data"})
+	}
+	netIncome := req.TotalIncome - deduction - totalAllowances
 	calculatedTax, taxLevels := calculateProgressiveTax(netIncome)
 
 	fmt.Println("Calculated tax is ", calculatedTax)
@@ -63,24 +70,37 @@ func CalculateTax(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-func calculateDonationAllowance(allowances []Allowance) float64 {
-	totalDonations := 0.0
+func calculateAllowances(allowances []Allowance, kReceiptMax float64) (float64, error) {
+
+	totalAllowances := 0.0
 	for _, allowance := range allowances {
-		if allowance.AllowanceType == "donation" {
-			if allowance.Amount > 100000 {
-				totalDonations += 100000
-			} else {
-				totalDonations += allowance.Amount
-			}
+		if allowance.AllowanceType == "donation" && allowance.Amount > 100000 {
+			totalAllowances += 100000
+		} else if allowance.AllowanceType == "k-receipt" && allowance.Amount > kReceiptMax {
+			totalAllowances += kReceiptMax
+		} else {
+			totalAllowances += allowance.Amount
 		}
 	}
-	return totalDonations
+	return totalAllowances, nil
 }
 
 func fetchDeduction() (float64, error) {
 	var deduction float64
 	err := initdb.DB.QueryRow("SELECT deduction FROM admin_config").Scan(&deduction)
+	if err != nil {
+		return 0, err
+	}
 	return deduction, err
+}
+
+func fetchKReceiptMax() (float64, error) {
+	var kReceiptMax float64
+	err := initdb.DB.QueryRow("SELECT kreceipt FROM admin_config").Scan(&kReceiptMax)
+	if err != nil {
+		return 0, err
+	}
+	return kReceiptMax, nil
 }
 
 func calculateProgressiveTax(income float64) (float64, []TaxLevel) {
@@ -127,7 +147,7 @@ func validateReq(req *TaxRequest) (bool, string) {
 		return false, "'WHT' cannot be more than total income"
 	}
 	for _, allowance := range req.Allowances {
-		if allowance.AllowanceType != "donation" {
+		if allowance.AllowanceType != "donation" && allowance.AllowanceType != "k-receipt" {
 			return false, "allowanceType must be 'donation'"
 		}
 		if allowance.Amount < 0 {

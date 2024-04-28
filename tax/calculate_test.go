@@ -76,22 +76,31 @@ func TestCalculateProgressiveTax(t *testing.T) {
 	}
 }
 
-func TestCalculateDonationAllowance(t *testing.T) {
+func TestCalculateAllowances(t *testing.T) {
+	kReceiptMax := 50000.0 // Mocked maximum value for "k-receipt"
+
 	tests := []struct {
-		name       string
-		allowances []Allowance
-		expected   float64
+		name        string
+		allowances  []Allowance
+		kReceiptMax float64
+		expected    float64
 	}{
-		{"Donation Below Cap", []Allowance{{AllowanceType: "donation", Amount: 50000}}, 50000},
-		{"Donation At Cap", []Allowance{{AllowanceType: "donation", Amount: 100000}}, 100000},
-		{"Donation Above Cap", []Allowance{{AllowanceType: "donation", Amount: 200000}}, 100000},
+		{"Donation Below Cap", []Allowance{{AllowanceType: "donation", Amount: 50000}}, kReceiptMax, 50000},
+		{"Donation At Cap", []Allowance{{AllowanceType: "donation", Amount: 100000}}, kReceiptMax, 100000},
+		{"Donation Above Cap", []Allowance{{AllowanceType: "donation", Amount: 200000}}, kReceiptMax, 100000},
+		{"K-Receipt Below Cap", []Allowance{{AllowanceType: "k-receipt", Amount: 30000}}, kReceiptMax, 30000},
+		{"K-Receipt At Cap", []Allowance{{AllowanceType: "k-receipt", Amount: 50000}}, kReceiptMax, 50000},
+		{"K-Receipt Above Cap", []Allowance{{AllowanceType: "k-receipt", Amount: 70000}}, kReceiptMax, 50000},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculateDonationAllowance(tt.allowances)
+			got, err := calculateAllowances(tt.allowances, tt.kReceiptMax)
+			if err != nil {
+				t.Errorf("calculateAllowances() error = %v", err)
+			}
 			if got != tt.expected {
-				t.Errorf("calculateDonationAllowance() = %v, want %v", got, tt.expected)
+				t.Errorf("calculateAllowances() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
