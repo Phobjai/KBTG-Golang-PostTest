@@ -11,3 +11,11 @@ type DeductionUpdateResponse struct {
 type Err struct {
 	Message string `json:"message"`
 }
+
+type KReceiptUpdateRequest struct {
+	Amount float64 `json:"amount"`
+}
+
+type KReceiptUpdateResponse struct {
+	KReceipt float64 `json:"kReceipt"`
+}

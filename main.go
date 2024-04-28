@@ -32,11 +32,11 @@ func main() {
 	e.POST("/tax/calculations", tax.CalculateTax)
 	e.POST("/tax/calculations/upload-csv", tax.CalculateTaxFromCSV)
 
-	adminGroup := e.Group("/admin")
+	//admin route
+	adminGroup := e.Group("/admin/deductions")
 	adminGroup.Use(middleware.BasicAuth(validateAdmin))
-
-	// Admin specific routes
-	adminGroup.POST("/deductions/personal", admin.UpdatePersonalDeduction)
+	adminGroup.POST("/personal", admin.UpdatePersonalDeduction)
+	adminGroup.POST("/k-receipt", admin.UpdateKReceipt)
 
 	port := os.Getenv("PORT")
 
