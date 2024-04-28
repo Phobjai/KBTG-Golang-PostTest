@@ -50,5 +50,5 @@ func main() {
 
 	//
 
-	fmt.Println("bye bye")
+	fmt.Println("shutting down the server")
 }
