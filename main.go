@@ -60,7 +60,7 @@ func main() {
 
 	//
 
-	fmt.Println("bye bye")
+	fmt.Println("shutting down the server")
 }
 
 func validateAdmin(username, password string, c echo.Context) (bool, error) {
